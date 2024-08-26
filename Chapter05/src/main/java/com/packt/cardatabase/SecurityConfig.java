@@ -17,7 +17,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
 import static org.springframework.security.config.Customizer.withDefaults;
 
 import com.packt.cardatabase.service.UserDetailsServiceImpl;
@@ -27,29 +26,31 @@ import com.packt.cardatabase.service.UserDetailsServiceImpl;
 public class SecurityConfig {
 	private final UserDetailsServiceImpl userDetailsService;
 	private final AuthenticationFilter authenticationFilter;
-	private final AuthEntryPoint exceptionHandler;
+	private static final String[] SWAGGER_PATHS = {"/api-docs/**", "/swagger-ui/**"};
 
-	public SecurityConfig(UserDetailsServiceImpl userDetailsService, AuthenticationFilter authenticationFilter,
-			AuthEntryPoint exceptionHandler) {
+	public SecurityConfig(UserDetailsServiceImpl userDetailsService, AuthenticationFilter authenticationFilter) {
 		this.userDetailsService = userDetailsService;
 		this.authenticationFilter = authenticationFilter;
-		this.exceptionHandler = exceptionHandler;
-	}
-
-	public void configureGlobal(AuthenticationManagerBuilder auth) throws Exception {
-		auth.userDetailsService(userDetailsService).passwordEncoder(new BCryptPasswordEncoder());
 	}
 
 	@Bean
-	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {	
 		http.csrf((csrf) -> csrf.disable()).cors(withDefaults())
 				.sessionManagement(
 						(sessionManagement) -> sessionManagement.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests((authorizeHttpRequests) -> authorizeHttpRequests
-						.requestMatchers(HttpMethod.POST, "/login").permitAll().anyRequest().authenticated())
+						.requestMatchers(HttpMethod.POST, "/login").permitAll()
+						.requestMatchers(SWAGGER_PATHS).permitAll()
+						.anyRequest().authenticated())
 				.addFilterBefore(authenticationFilter, UsernamePasswordAuthenticationFilter.class)
-				.exceptionHandling((exceptionHandling) -> exceptionHandling.authenticationEntryPoint(exceptionHandler));
+				.exceptionHandling((exceptionHandling) -> exceptionHandling
+				.accessDeniedPage("/errors/access-denied"));
+
 		return http.build();
+	}
+
+	public void configureGlobal(AuthenticationManagerBuilder auth) throws Exception {
+		auth.userDetailsService(userDetailsService).passwordEncoder(new BCryptPasswordEncoder());
 	}
 
 	@Bean
@@ -58,7 +59,7 @@ public class SecurityConfig {
 	}
 
 	@Bean
-	public AuthenticationManager uthenticationManager(AuthenticationConfiguration authConfig) throws Exception {
+	public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
 		return authConfig.getAuthenticationManager();
 	}
 
@@ -71,6 +72,7 @@ public class SecurityConfig {
 		config.setAllowedHeaders(Arrays.asList("*"));
 		config.setAllowCredentials(false);
 		config.applyPermitDefaultValues();
+
 		source.registerCorsConfiguration("/**", config);
 		return source;
 	}
